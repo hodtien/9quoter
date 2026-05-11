@@ -157,22 +157,26 @@ struct CompactQuotaRow: View {
                     }
                 }
                 .frame(height: 4)
-                Text(entry.unlimited ? "0 / ∞" : "\(entry.used) / \(entry.total)")
-                    .font(.system(size: 9).monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.36))
-            }
-            .frame(width: 248, alignment: .leading)
 
-            Text(entry.unlimited ? "∞" : "\(remainingPct)%")
-                .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                .foregroundStyle(color)
-                .frame(width: 42, alignment: .trailing)
+                HStack(spacing: 0) {
+                    Text(entry.unlimited ? "0 / ∞" : "\(entry.used) / \(entry.total)")
+                        .font(.system(size: 9).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.36))
+
+                    Spacer()
+
+                    Text(entry.unlimited ? "∞" : "\(remainingPct)%")
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(color)
+                }
+            }
+            .frame(width: 300, alignment: .leading)
 
             Text(resetText)
                 .font(.system(size: 9.5, weight: .medium).monospacedDigit())
                 .foregroundStyle(.white.opacity(resetText == "—" ? 0.22 : 0.58))
                 .lineLimit(1)
-                .frame(width: 92, alignment: .trailing)
+                .frame(width: 92, alignment: .leading)
         }
     }
 }
