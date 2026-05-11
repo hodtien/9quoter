@@ -118,13 +118,21 @@ struct CompactQuotaRow: View {
 
     private var resetText: String {
         guard let str = entry.resetAt,
-              let date = ISO8601DateFormatter().date(from: str) else { return "" }
+              let date = resetDate(from: str) else { return "—" }
         let diff = max(0, date.timeIntervalSince(Date()))
         let h = Int(diff / 3600)
         let m = Int((diff.truncatingRemainder(dividingBy: 3600)) / 60)
         if h >= 24 { return "in \(h / 24)d \(h % 24)h" }
         if h > 0 { return "in \(h)h \(m)m" }
         return "in \(m)m"
+    }
+
+    private func resetDate(from string: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: string) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
     }
 
     var body: some View {
@@ -153,7 +161,7 @@ struct CompactQuotaRow: View {
                     .font(.system(size: 9).monospacedDigit())
                     .foregroundStyle(.white.opacity(0.36))
             }
-            .frame(width: 300, alignment: .leading)
+            .frame(width: 248, alignment: .leading)
 
             Text(entry.unlimited ? "∞" : "\(remainingPct)%")
                 .font(.system(size: 10, weight: .semibold).monospacedDigit())
@@ -161,9 +169,10 @@ struct CompactQuotaRow: View {
                 .frame(width: 42, alignment: .trailing)
 
             Text(resetText)
-                .font(.system(size: 9.5).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.46))
-                .frame(width: 62, alignment: .trailing)
+                .font(.system(size: 9.5, weight: .medium).monospacedDigit())
+                .foregroundStyle(.white.opacity(resetText == "—" ? 0.22 : 0.58))
+                .lineLimit(1)
+                .frame(width: 92, alignment: .trailing)
         }
     }
 }
