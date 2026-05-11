@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude / local agent state
+.claude/
+
+# IDE
+.vscode/
+.idea/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# SwiftPM
+.build/
+*.build/
+.swiftpm/
+Package.resolved
+
+# Release artifacts
+9QuoterApp/dist/
+*.dSYM
+
+# Local scratch
+*.log
+tmp.txt
+
+# Secrets / local config
+.env
+.env.*
+*.local
