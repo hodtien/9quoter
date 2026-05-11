@@ -132,8 +132,8 @@ struct CompactQuotaRow: View {
             HStack(spacing: 5) {
                 Circle().fill(color).frame(width: 6, height: 6)
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.72))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.64))
                     .lineLimit(1)
             }
             .frame(width: 118, alignment: .leading)

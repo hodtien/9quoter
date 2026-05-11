@@ -4,7 +4,7 @@ struct MenubarContentView: View {
     @ObservedObject var service: RouterService
     @ObservedObject var settings: SettingsStore
     @State private var showSettings = false
-    @State private var showInactive = false
+    @State private var showInactive = true
     @State private var searchText = ""
 
     private var visibleProviders: [ProviderQuota] {
@@ -175,7 +175,7 @@ struct MenubarContentView: View {
                                 }
                             }
                         }
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 150)
                     }
                     .frame(minHeight: 360, maxHeight: 860)
                 }

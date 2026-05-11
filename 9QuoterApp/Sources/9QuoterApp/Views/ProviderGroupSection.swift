@@ -31,22 +31,28 @@ struct ProviderGroupHeader: View {
             }
 
             Text(title)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white.opacity(0.86))
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.82))
 
             Text("\(activeCount)/\(accounts.count)")
-                .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.42))
+                .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.38))
                 .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.08), in: Capsule())
+                .padding(.vertical, 1.5)
+                .background(Color.white.opacity(0.065), in: Capsule())
 
             Spacer()
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-        .background(Color(red: 0.10, green: 0.09, blue: 0.14).opacity(0.88))
+        .padding(.vertical, 6)
+        .background(Color(red: 0.11, green: 0.10, blue: 0.16))
+        .zIndex(1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 1)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 6, y: 3)
     }
 }
 
@@ -64,6 +70,7 @@ struct ProviderGroupSection: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 7)
+        .padding(.top, 8)
+        .padding(.bottom, 7)
     }
 }
