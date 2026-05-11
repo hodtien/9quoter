@@ -35,13 +35,25 @@ struct AccountQuotaCard: View {
                         isToggling = false
                     }
                 } label: {
-                    if isToggling {
-                        ProgressView().controlSize(.mini).tint(.white.opacity(0.45))
-                    } else {
-                        Circle()
-                            .fill(account.isActive ? Color(red: 0.95, green: 0.36, blue: 0.25) : Color.white.opacity(0.18))
-                            .frame(width: 9, height: 9)
+                    ZStack(alignment: account.isActive ? .trailing : .leading) {
+                        Capsule()
+                            .fill(account.isActive ? Color(red: 0.92, green: 0.36, blue: 0.25) : Color.white.opacity(0.10))
+                            .frame(width: 32, height: 18)
+
+                        if isToggling {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .tint(.white.opacity(0.85))
+                                .frame(width: 16, height: 16)
+                                .padding(.horizontal, 1)
+                        } else {
+                            Circle()
+                                .fill(account.isActive ? Color.white : Color.white.opacity(0.65))
+                                .frame(width: 14, height: 14)
+                                .padding(.horizontal, 2)
+                        }
                     }
+                    .animation(.easeInOut(duration: 0.16), value: account.isActive)
                 }
                 .buttonStyle(.plain)
                 .help(account.isActive ? "Disable account" : "Enable account")
