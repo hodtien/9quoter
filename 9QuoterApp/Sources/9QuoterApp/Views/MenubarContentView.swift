@@ -160,21 +160,24 @@ struct MenubarContentView: View {
 
                 } else {
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 0) {
+                        LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                             ForEach(groupedProviders, id: \.key) { group in
-                                ProviderGroupSection(providerName: group.key, accounts: group.value, baseURL: settings.baseURL) { account, isActive in
-                                    Task { await service.setAccount(account, isActive: isActive) }
-                                }
-                                .padding(.horizontal, 16)
+                                Section {
+                                    ProviderGroupSection(accounts: group.value, baseURL: settings.baseURL) { account, isActive in
+                                        Task { await service.setAccount(account, isActive: isActive) }
+                                    }
 
-                                Divider()
-                                    .background(Color.white.opacity(0.06))
-                                    .padding(.horizontal, 12)
+                                    Divider()
+                                        .background(Color.white.opacity(0.06))
+                                        .padding(.horizontal, 12)
+                                } header: {
+                                    ProviderGroupHeader(providerName: group.key, accounts: group.value, baseURL: settings.baseURL)
+                                }
                             }
                         }
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 10)
                     }
-                    .frame(minHeight: 320, maxHeight: 780)
+                    .frame(minHeight: 360, maxHeight: 860)
                 }
             }
 
@@ -226,6 +229,7 @@ struct MenubarContentView: View {
             .padding(.vertical, 14)
         }
         .frame(width: 590)
+        .frame(minHeight: 520)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(red: 0.10, green: 0.09, blue: 0.14))

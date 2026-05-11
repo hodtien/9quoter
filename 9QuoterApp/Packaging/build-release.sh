@@ -6,7 +6,7 @@ BUILD_DIR="$ROOT_DIR/.build/release"
 DIST_DIR="$ROOT_DIR/dist"
 APP_NAME="9Quoter"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
-VERSION="0.1.1"
+VERSION="0.1.2"
 
 rm -rf "$DIST_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
