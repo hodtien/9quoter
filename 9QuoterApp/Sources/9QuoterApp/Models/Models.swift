@@ -30,7 +30,7 @@ struct QuotaEntry: Codable {
     let remaining: Int
     let unlimited: Bool
     let resetAt: String?
-    let remainingPercentage: Int?
+    let remainingPercentage: Double?
 }
 
 struct ExtraUsage: Codable {

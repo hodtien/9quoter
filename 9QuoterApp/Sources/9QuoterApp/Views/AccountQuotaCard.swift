@@ -101,7 +101,7 @@ struct CompactQuotaRow: View {
 
     private var remainingPct: Int {
         guard !entry.unlimited, entry.total > 0 else { return 100 }
-        if let pct = entry.remainingPercentage { return pct }
+        if let pct = entry.remainingPercentage { return Int(pct) }
         return Int(Double(entry.remaining) / Double(entry.total) * 100)
     }
 
