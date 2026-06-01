@@ -6,6 +6,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var password = ""
+    @State private var basicAuthUsername = ""
+    @State private var basicAuthPassword = ""
     @State private var isLoggingIn = false
     @State private var message: String?
 
@@ -54,6 +56,29 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
+                Text("Basic Auth (optional)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                TextField("Username", text: $basicAuthUsername)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.86))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                SecureField("Password", text: $basicAuthPassword)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.86))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                Text("For servers protected by browser-level authentication.")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.white.opacity(0.32))
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Quota refresh interval: \(Int(settings.refreshInterval))s")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.45))
@@ -99,6 +124,10 @@ struct SettingsView: View {
         .padding(16)
         .frame(width: 320)
         .background(Color(red: 0.10, green: 0.09, blue: 0.14))
+        .onAppear {
+            basicAuthUsername = settings.basicAuthUsername
+            basicAuthPassword = settings.basicAuthPassword
+        }
     }
 
     private var appVersion: String {
@@ -109,6 +138,7 @@ struct SettingsView: View {
     private func loginAndRefresh() async {
         isLoggingIn = true
         message = nil
+        settings.setBasicAuth(username: basicAuthUsername, password: basicAuthPassword)
         service.baseURL = settings.baseURL
         service.syncBasicAuthCredentials(settings.basicAuthCredentials)
         service.quotaAccountScope = settings.quotaAccountScope
