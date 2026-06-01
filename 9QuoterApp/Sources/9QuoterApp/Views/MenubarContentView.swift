@@ -91,17 +91,6 @@ struct MenubarContentView: View {
             .sorted { ProviderFilterOption.groupRank($0.key) < ProviderFilterOption.groupRank($1.key) }
     }
 
-    private func groupRank(_ key: String) -> Int {
-        switch key {
-        case "claude": return 0
-        case "github": return 1
-        case "codex": return 2
-        case "minimax": return 3
-        case "gemini": return 4
-        default: return 99
-        }
-    }
-
     var body: some View {
         if !service.isAuthenticated {
             LoginView(service: service, settings: settings)
