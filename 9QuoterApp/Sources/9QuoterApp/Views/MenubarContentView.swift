@@ -197,6 +197,16 @@ struct MenubarContentView: View {
                 .background(Color.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 8))
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
+
+                if providerFilterOptions.count > 2 {
+                    ProviderFilterBar(
+                        options: providerFilterOptions,
+                        selected: resolvedSelectedProviderFilter,
+                        baseURL: settings.baseURL
+                    ) { key in
+                        selectedProviderFilter = key
+                    }
+                }
             }
 
             // Error banner
