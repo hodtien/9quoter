@@ -4,9 +4,9 @@
 
 ## Screenshots
 
-![9Quoter quotas dashboard](assets/quotas-dashboard.png)
+<img src="assets/quotas-dashboard.png" alt="9Quoter quotas dashboard" width="640">
 
-![9Quoter usage dashboard](assets/usage-dashboard.png)
+<img src="assets/usage-dashboard.png" alt="9Quoter usage dashboard" width="640">
 
 ## Features
 
