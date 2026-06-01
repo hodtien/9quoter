@@ -2,6 +2,10 @@
 
 9Quoter is a native macOS menu bar app for tracking quota usage across 9router providers.
 
+## Screenshot
+
+![9Quoter usage dashboard](assets/usage-dashboard.png)
+
 ## Features
 
 - Tracks quota usage by provider and account
