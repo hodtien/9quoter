@@ -70,6 +70,21 @@ struct ProviderFilterTests {
         #expect(options.map(\.id) == [.all, .provider("github")])
     }
 
+    @Test("Clears selected provider when it is no longer available")
+    func clearsUnavailableSelectedProvider() {
+        let accounts = [
+            provider(id: "github-1", provider: "github", name: "Account 1", isActive: true)
+        ]
+        let options = ProviderFilterOption.options(for: accounts)
+
+        let resolved = ProviderFilterOption.resolvedSelection(
+            selectedProvider: "codex",
+            options: options
+        )
+
+        #expect(resolved == nil)
+    }
+
     private func provider(
         id: String,
         provider: String,

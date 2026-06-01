@@ -7,6 +7,7 @@ struct MenubarContentView: View {
     @State private var showSettings = false
     @State private var showInactive = true
     @State private var searchText = ""
+    @State private var selectedProviderFilter: String?
     @State private var selectedTab: PanelTab = .quotas
     @State private var recentChartRefreshTask: Task<Void, Never>?
 
@@ -37,15 +38,27 @@ struct MenubarContentView: View {
         }
     }
 
+    private var visibilityFilteredProviders: [ProviderQuota] {
+        ProviderFilterOption.visibleAccounts(service.providers, showInactive: showInactive)
+    }
+
+    private var providerFilterOptions: [ProviderFilterOption] {
+        ProviderFilterOption.options(for: visibilityFilteredProviders)
+    }
+
+    private var resolvedSelectedProviderFilter: String? {
+        ProviderFilterOption.resolvedSelection(
+            selectedProvider: selectedProviderFilter,
+            options: providerFilterOptions
+        )
+    }
+
     private var visibleProviders: [ProviderQuota] {
-        let base = showInactive ? service.providers : service.providers.filter(\.isActive)
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return base }
-        return base.filter { provider in
-            provider.provider.lowercased().contains(query)
-                || provider.name.lowercased().contains(query)
-                || provider.plan.lowercased().contains(query)
-        }
+        ProviderFilterOption.filteredAccounts(
+            visibilityFilteredProviders,
+            selectedProvider: resolvedSelectedProviderFilter,
+            searchText: searchText
+        )
     }
 
     private func startQuotaRefreshIfNeeded() {
@@ -71,11 +84,11 @@ struct MenubarContentView: View {
 
     private var groupedProviders: [(key: String, value: [ProviderQuota])] {
         let grouped = Dictionary(grouping: visibleProviders) { provider in
-            provider.provider.components(separatedBy: "-").first ?? provider.provider
+            ProviderFilterOption.providerKey(for: provider)
         }
         return grouped
             .map { ($0.key, $0.value.sorted { ($0.priority, $0.name) < ($1.priority, $1.name) }) }
-            .sorted { groupRank($0.key) < groupRank($1.key) }
+            .sorted { ProviderFilterOption.groupRank($0.key) < ProviderFilterOption.groupRank($1.key) }
     }
 
     private func groupRank(_ key: String) -> Int {
