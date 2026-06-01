@@ -6,14 +6,7 @@ struct ProviderGroupHeader: View {
     let baseURL: String
 
     private var title: String {
-        switch providerName {
-        case let p where p.hasPrefix("github"): return "Github"
-        case let p where p.hasPrefix("claude"): return "Claude"
-        case let p where p.hasPrefix("codex"): return "Codex"
-        case let p where p.hasPrefix("gemini"): return "Gemini"
-        case let p where p.hasPrefix("minimax"): return "MiniMax"
-        default: return providerName.capitalized
-        }
+        ProviderFilterOption.providerTitle(for: providerName)
     }
 
     private var representative: ProviderQuota? {
