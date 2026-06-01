@@ -13,9 +13,30 @@ struct BasicAuthCredentials: Equatable {
     }
 }
 
+protocol CredentialStoring {
+    func load(key: String) -> String?
+    func save(_ value: String, key: String)
+    func delete(key: String)
+}
+
+struct KeychainCredentialStore: CredentialStoring {
+    func load(key: String) -> String? {
+        KeychainStore.load(key: key)
+    }
+
+    func save(_ value: String, key: String) {
+        KeychainStore.save(value, key: key)
+    }
+
+    func delete(key: String) {
+        KeychainStore.delete(key: key)
+    }
+}
+
 class SettingsStore: ObservableObject {
     static let basicAuthUsernameKey = "basicAuthUsername"
     static let basicAuthPasswordKey = "basicAuthPassword"
+    private static let authTokenKey = "authToken"
 
     @Published var baseURL: String {
         didSet { UserDefaults.standard.set(baseURL, forKey: "baseURL") }
@@ -29,44 +50,48 @@ class SettingsStore: ObservableObject {
     @Published private(set) var basicAuthUsername: String
     @Published private(set) var basicAuthPassword: String
 
+    private let credentialStore: CredentialStoring
+
     var basicAuthCredentials: BasicAuthCredentials {
         BasicAuthCredentials(username: basicAuthUsername, password: basicAuthPassword)
     }
 
     var authToken: String {
-        get { KeychainStore.load(key: "authToken") ?? "" }
-        set { KeychainStore.save(newValue, key: "authToken") }
+        get { credentialStore.load(key: Self.authTokenKey) ?? "" }
+        set { credentialStore.save(newValue, key: Self.authTokenKey) }
     }
 
-    init() {
+    init(credentialStore: CredentialStoring = KeychainCredentialStore()) {
+        self.credentialStore = credentialStore
         self.baseURL = UserDefaults.standard.string(forKey: "baseURL") ?? "http://localhost:20128"
         let saved = UserDefaults.standard.double(forKey: "refreshInterval")
         self.refreshInterval = saved > 0 ? saved : 60
         let savedScope = UserDefaults.standard.string(forKey: "quotaAccountScope")
         self.quotaAccountScope = savedScope.flatMap(QuotaAccountScope.init(rawValue:)) ?? .active
-        self.basicAuthUsername = KeychainStore.load(key: Self.basicAuthUsernameKey) ?? ""
-        self.basicAuthPassword = KeychainStore.load(key: Self.basicAuthPasswordKey) ?? ""
+        self.basicAuthUsername = credentialStore.load(key: Self.basicAuthUsernameKey) ?? ""
+        self.basicAuthPassword = credentialStore.load(key: Self.basicAuthPasswordKey) ?? ""
     }
 
     func setBasicAuth(username: String, password: String) {
-        basicAuthUsername = username
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        basicAuthUsername = trimmedUsername
         basicAuthPassword = password
 
-        if username.isEmpty {
-            KeychainStore.delete(key: Self.basicAuthUsernameKey)
+        if trimmedUsername.isEmpty {
+            credentialStore.delete(key: Self.basicAuthUsernameKey)
         } else {
-            KeychainStore.save(username, key: Self.basicAuthUsernameKey)
+            credentialStore.save(trimmedUsername, key: Self.basicAuthUsernameKey)
         }
 
         if password.isEmpty {
-            KeychainStore.delete(key: Self.basicAuthPasswordKey)
+            credentialStore.delete(key: Self.basicAuthPasswordKey)
         } else {
-            KeychainStore.save(password, key: Self.basicAuthPasswordKey)
+            credentialStore.save(password, key: Self.basicAuthPasswordKey)
         }
     }
 
     func clearToken() {
-        KeychainStore.delete(key: "authToken")
+        credentialStore.delete(key: Self.authTokenKey)
         objectWillChange.send()
     }
 }
