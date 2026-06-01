@@ -39,6 +39,8 @@ class RouterService: ObservableObject {
 
     var baseURL: String
     var basicAuthCredentials: BasicAuthCredentials
+
+    private let credentialStore: CredentialStoring
     var authToken: String {
         didSet {
             isAuthenticated = !authToken.isEmpty
@@ -54,16 +56,31 @@ class RouterService: ObservableObject {
     private var lastStatsRefresh = Date.distantPast
     private var recentStatsGeneration = 0
 
-    init() {
+    init(credentialStore: CredentialStoring = KeychainCredentialStore()) {
         let savedURL = UserDefaults.standard.string(forKey: "baseURL") ?? "http://localhost:20128"
-        let stored = KeychainStore.load(key: "authToken") ?? ""
-        let savedUsername = KeychainStore.load(key: SettingsStore.basicAuthUsernameKey) ?? ""
-        let savedPassword = KeychainStore.load(key: SettingsStore.basicAuthPasswordKey) ?? ""
+        let stored = credentialStore.load(key: "authToken") ?? ""
         self.baseURL = savedURL
         self.authToken = stored
         self.isAuthenticated = !stored.isEmpty
-        self.basicAuthCredentials = BasicAuthCredentials(username: savedUsername, password: savedPassword)
+        self.credentialStore = credentialStore
+        self.basicAuthCredentials = BasicAuthCredentials(username: "", password: "")
+        syncBasicAuthCredentials()
         // quotaAccountScope is owned by SettingsStore and synced in on appear.
+    }
+
+    func syncBasicAuthCredentials() {
+        syncBasicAuthCredentials(BasicAuthCredentials(
+            username: credentialStore.load(key: SettingsStore.basicAuthUsernameKey) ?? "",
+            password: credentialStore.load(key: SettingsStore.basicAuthPasswordKey) ?? ""
+        ))
+    }
+
+    func syncBasicAuthCredentials(_ credentials: BasicAuthCredentials) {
+        basicAuthCredentials = credentials
+    }
+
+    func reloadBasicAuthCredentials() {
+        syncBasicAuthCredentials()
     }
 
     func login(password: String) async throws {
@@ -326,7 +343,16 @@ class RouterService: ObservableObject {
 
     static func applyBasicAuth(_ credentials: BasicAuthCredentials, to request: inout URLRequest) {
         guard let header = credentials.authorizationHeader else { return }
+        guard isLocalOrSecure(request.url) else { return }
         request.setValue(header, forHTTPHeaderField: "Authorization")
+    }
+
+    private static func isLocalOrSecure(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        if url.scheme == "https" { return true }
+        guard url.scheme == "http" else { return false }
+        let host = url.host ?? ""
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
     static func applyAuthCookie(token: String, to request: inout URLRequest) {

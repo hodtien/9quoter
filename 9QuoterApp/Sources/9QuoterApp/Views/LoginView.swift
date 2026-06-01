@@ -78,6 +78,7 @@ struct LoginView: View {
         isLoggingIn = true
         errorMsg = nil
         service.baseURL = settings.baseURL
+        service.syncBasicAuthCredentials(settings.basicAuthCredentials)
         do {
             try await service.login(password: password)
             settings.authToken = service.authToken

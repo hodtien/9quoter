@@ -110,6 +110,7 @@ struct SettingsView: View {
         isLoggingIn = true
         message = nil
         service.baseURL = settings.baseURL
+        service.syncBasicAuthCredentials(settings.basicAuthCredentials)
         service.quotaAccountScope = settings.quotaAccountScope
         do {
             if !password.isEmpty {
