@@ -10,7 +10,7 @@ struct SettingsView: View {
     @State private var message: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Settings")
                     .font(.system(size: 16, weight: .bold))
@@ -54,10 +54,13 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Refresh interval: \(Int(settings.refreshInterval))s")
+                Text("Quota refresh interval: \(Int(settings.refreshInterval))s")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.45))
                 Slider(value: $settings.refreshInterval, in: 15...300, step: 15)
+                Text("Applies to the Quotas tab only. Usage updates live.")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.white.opacity(0.32))
             }
 
             if let message {
@@ -67,15 +70,6 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 10) {
-                Button("Logout") {
-                    service.logout()
-                    settings.clearToken()
-                    message = "Logged out"
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.red.opacity(0.85))
-
                 Spacer()
 
                 Button("Cancel") { dismiss() }
@@ -89,31 +83,40 @@ struct SettingsView: View {
                     if isLoggingIn {
                         ProgressView().controlSize(.mini).tint(.white.opacity(0.8))
                     } else {
-                        Text(password.isEmpty ? "Save" : "Login & Refresh")
+                        Text(password.isEmpty ? "Save" : "Sign in")
                     }
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.purple.opacity(0.9))
             }
+
+            Text("9Quoter \(appVersion)")
+                .font(.system(size: 9.5))
+                .foregroundStyle(.white.opacity(0.28))
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(18)
-        .frame(width: 340)
+        .padding(16)
+        .frame(width: 320)
         .background(Color(red: 0.10, green: 0.09, blue: 0.14))
+    }
+
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        return "v\(version)"
     }
 
     private func loginAndRefresh() async {
         isLoggingIn = true
         message = nil
         service.baseURL = settings.baseURL
+        service.quotaAccountScope = settings.quotaAccountScope
         do {
             if !password.isEmpty {
                 try await service.login(password: password)
                 settings.authToken = service.authToken
                 password = ""
             }
-            service.startAutoRefresh(interval: settings.refreshInterval)
-            await service.refresh()
             message = "Saved"
             dismiss()
         } catch {

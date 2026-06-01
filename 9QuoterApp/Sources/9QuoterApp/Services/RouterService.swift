@@ -21,13 +21,35 @@ class RouterService: ObservableObject {
     @Published var isAuthenticated = false
     @Published var error: String?
     @Published var lastRefreshed: Date?
+    @Published var quotaAccountScope: QuotaAccountScope = .active
+    @Published var nextRefreshAt: Date?
+    @Published var recentRequests: [RecentRequest] = []
+    @Published var recentStats: RecentUsageStats = .empty
+    @Published var recentStatsPeriod: RecentStatsPeriod = .today
+    @Published var recentChartPoints: [RecentUsageChartPoint] = []
+    @Published var recentRequestsError: String?
+    @Published var isLoadingRecentRequests = false
+    @Published var recentStreamStatus: RecentStreamStatus = .idle
+
+    var hasLoadedProviders: Bool {
+        lastRefreshed != nil || !providers.isEmpty
+    }
 
     var baseURL: String
     var authToken: String {
-        didSet { isAuthenticated = !authToken.isEmpty }
+        didSet {
+            isAuthenticated = !authToken.isEmpty
+            if authToken.isEmpty {
+                stopAutoRefresh()
+            }
+        }
     }
 
     private var refreshTask: Task<Void, Never>?
+    private var recentStreamTask: Task<Void, Never>?
+    private var autoRefreshGeneration = 0
+    private var lastStatsRefresh = Date.distantPast
+    private var recentStatsGeneration = 0
 
     init() {
         let savedURL = UserDefaults.standard.string(forKey: "baseURL") ?? "http://localhost:20128"
@@ -35,13 +57,7 @@ class RouterService: ObservableObject {
         self.baseURL = savedURL
         self.authToken = stored
         self.isAuthenticated = !stored.isEmpty
-
-        if !stored.isEmpty {
-            let interval = UserDefaults.standard.double(forKey: "refreshInterval")
-            Task { @MainActor in
-                self.startAutoRefresh(interval: interval > 0 ? interval : 60)
-            }
-        }
+        // quotaAccountScope is owned by SettingsStore and synced in on appear.
     }
 
     func login(password: String) async throws {
@@ -75,8 +91,12 @@ class RouterService: ObservableObject {
     func logout() {
         KeychainStore.delete(key: "authToken")
         KeychainStore.delete(key: "loginPassword")
+        stopRecentStream()
         authToken = ""
         providers = []
+        recentRequests = []
+        recentStats = .empty
+        recentRequestsError = nil
         stopAutoRefresh()
     }
 
@@ -87,26 +107,20 @@ class RouterService: ObservableObject {
         }
         isLoading = true
         error = nil
+        defer { isLoading = false }
+
         do {
             let clients = try await fetchClientsWithRetry()
-            var results: [ProviderQuota] = []
-            await withTaskGroup(of: ProviderQuota?.self) { group in
-                for client in clients {
-                    group.addTask {
-                        try? await self.buildProviderQuota(client: client)
-                    }
-                }
-                for await result in group {
-                    if let r = result { results.append(r) }
-                }
+            let scopedClients = quotaAccountScope == .active ? clients.filter(\.isActive) : clients
+            if providers.isEmpty {
+                providers = placeholderProviderQuotas(for: scopedClients)
             }
-            results.sort { ($0.priority, $0.name) < ($1.priority, $1.name) }
-            providers = results
+            let quotas = await fetchProviderQuotas(for: scopedClients)
+            providers = quotas.sorted { ($0.priority, $0.name) < ($1.priority, $1.name) }
             lastRefreshed = Date()
         } catch {
             self.error = error.localizedDescription
         }
-        isLoading = false
     }
 
     func setAccount(_ account: ProviderQuota, isActive: Bool) async {
@@ -126,7 +140,9 @@ class RouterService: ObservableObject {
                     plan: provider.plan,
                     quotas: provider.quotas,
                     limitReached: provider.limitReached,
-                    priority: provider.priority
+                    priority: provider.priority,
+                    message: provider.message,
+                    quotaUnavailable: provider.quotaUnavailable
                 )
             }
             await refresh()
@@ -135,18 +151,162 @@ class RouterService: ObservableObject {
         }
     }
 
+    func refreshAccount(_ account: ProviderQuota) async {
+        guard !authToken.isEmpty else {
+            error = "Not authenticated — please sign in"
+            return
+        }
+        providers = providers.map { provider in
+            guard provider.id == account.id else { return provider }
+            return ProviderQuota(
+                id: provider.id,
+                provider: provider.provider,
+                name: provider.name,
+                isActive: provider.isActive,
+                plan: provider.plan,
+                quotas: provider.quotas,
+                limitReached: provider.limitReached,
+                priority: provider.priority,
+                message: provider.message,
+                quotaUnavailable: provider.quotaUnavailable,
+                isLoadingQuota: true
+            )
+        }
+        do {
+            let refreshed = try await buildProviderQuota(client: account.clientConnection)
+            providers = providers.map { provider in
+                provider.id == account.id ? refreshed : provider
+            }
+            lastRefreshed = Date()
+        } catch {
+            providers = providers.map { provider in
+                guard provider.id == account.id else { return provider }
+                return ProviderQuota(
+                    id: provider.id,
+                    provider: provider.provider,
+                    name: provider.name,
+                    isActive: provider.isActive,
+                    plan: provider.plan,
+                    quotas: provider.quotas,
+                    limitReached: provider.limitReached,
+                    priority: provider.priority,
+                    message: nil,
+                    quotaUnavailable: true
+                )
+            }
+            self.error = error.localizedDescription
+        }
+    }
+
+    func setQuotaAccountScope(_ scope: QuotaAccountScope) async {
+        quotaAccountScope = scope
+        await refresh()
+    }
+
     func startAutoRefresh(interval: TimeInterval = 60) {
+        autoRefreshGeneration += 1
+        let generation = autoRefreshGeneration
         refreshTask?.cancel()
-        refreshTask = Task {
-            while !Task.isCancelled {
-                await refresh()
+        nextRefreshAt = nil
+        refreshTask = Task { [weak self] in
+            guard let self else { return }
+            await self.refresh()
+
+            while !Task.isCancelled, self.autoRefreshGeneration == generation {
+                self.nextRefreshAt = Date().addingTimeInterval(interval)
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                guard !Task.isCancelled, self.autoRefreshGeneration == generation else { break }
+                self.nextRefreshAt = nil
+                await self.refresh()
             }
         }
     }
 
     func stopAutoRefresh() {
+        autoRefreshGeneration += 1
         refreshTask?.cancel()
+        refreshTask = nil
+        nextRefreshAt = nil
+    }
+
+    func startRecentStream() {
+        guard !authToken.isEmpty else {
+            recentRequestsError = "Not authenticated — please sign in"
+            recentStreamStatus = .offline
+            return
+        }
+        guard recentStreamTask == nil else { return }
+
+        recentRequestsError = nil
+        recentStreamStatus = .connecting
+        isLoadingRecentRequests = recentRequests.isEmpty
+        recentStreamTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.isLoadingRecentRequests = false
+                if !Task.isCancelled {
+                    self.recentStreamStatus = .offline
+                    self.recentStreamTask = nil
+                }
+            }
+            do {
+                let snapshot = try await self.fetchRecentRequests()
+                guard !Task.isCancelled else { return }
+                self.recentRequests = snapshot
+                self.isLoadingRecentRequests = false
+                try await self.consumeRecentStream()
+            } catch is CancellationError {
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.recentRequestsError = "Recent requests unavailable"
+                self.recentStreamStatus = .offline
+            }
+        }
+    }
+
+    func stopRecentStream() {
+        recentStreamTask?.cancel()
+        recentStreamTask = nil
+        recentStreamStatus = .idle
+        isLoadingRecentRequests = false
+    }
+
+    func setRecentStatsPeriod(_ period: RecentStatsPeriod) async {
+        guard period != recentStatsPeriod else { return }
+        recentStatsPeriod = period
+        recentStatsGeneration += 1
+        await refreshRecentStats()
+        await refreshRecentChart()
+    }
+
+    func refreshRecentStats() async {
+        guard !authToken.isEmpty else { return }
+        let generation = recentStatsGeneration
+        let period = recentStatsPeriod
+        guard let url = URL(string: "\(baseURL)/api/usage/stats?period=\(period.rawValue)") else { return }
+        do {
+            let data = try await get(url: url)
+            guard generation == recentStatsGeneration else { return }
+            let response = try JSONDecoder().decode(RecentUsageStatsResponse.self, from: data)
+            applySnapshotStats(response)
+        } catch {
+            // Keep last known stats on transient errors
+        }
+    }
+
+    func refreshRecentChart() async {
+        guard !authToken.isEmpty else { return }
+        let generation = recentStatsGeneration
+        let period = recentStatsPeriod
+        guard let url = URL(string: "\(baseURL)/api/usage/chart?period=\(period.rawValue)") else { return }
+        do {
+            let data = try await get(url: url)
+            guard generation == recentStatsGeneration else { return }
+            let points = try JSONDecoder().decode([RecentUsageChartPoint].self, from: data)
+            recentChartPoints = points
+        } catch {
+            // Keep last known chart on transient errors
+        }
     }
 
     // MARK: - Private
@@ -174,15 +334,140 @@ class RouterService: ObservableObject {
     }
 
     private func fetchClients() async throws -> [ClientConnection] {
-        let url = URL(string: "\(baseURL)/api/providers/client")!
+        let pageSize = 100
+        let firstPage = try await fetchClientsPage(page: 1, pageSize: pageSize)
+        guard let totalPages = firstPage.pagination?.totalPages, totalPages > 1 else {
+            return firstPage.connections
+        }
+
+        var clients = firstPage.connections
+        for page in 2...totalPages {
+            let response = try await fetchClientsPage(page: page, pageSize: pageSize)
+            clients.append(contentsOf: response.connections)
+        }
+        return clients
+    }
+
+    private func fetchClientsPage(page: Int, pageSize: Int) async throws -> ClientListResponse {
+        let url = URL(string: "\(baseURL)/api/providers/client?page=\(page)&pageSize=\(pageSize)&accountStatus=all&sort=priority")!
         let data = try await get(url: url)
-        return try JSONDecoder().decode(ClientListResponse.self, from: data).connections
+        return try JSONDecoder().decode(ClientListResponse.self, from: data)
     }
 
     private func updateAccount(id: String, isActive: Bool) async throws {
-        let url = URL(string: "\(baseURL)/api/providers/\(id)")!
+        guard let url = URL(string: "\(baseURL)/api/providers/\(id)") else {
+            throw LoginError.network(URLError(.badURL))
+        }
         let body = try JSONEncoder().encode(["isActive": isActive])
         try await sendJSON(url: url, method: "PUT", body: body)
+    }
+
+    private func placeholderProviderQuotas(for clients: [ClientConnection]) -> [ProviderQuota] {
+        clients
+            .map { client in
+                ProviderQuota(
+                    id: client.id,
+                    provider: client.provider,
+                    name: client.name,
+                    isActive: client.isActive,
+                    plan: "checking",
+                    quotas: [],
+                    limitReached: false,
+                    priority: client.priority ?? 99,
+                    message: "Checking quota...",
+                    quotaUnavailable: false,
+                    isLoadingQuota: true
+                )
+            }
+            .sorted { ($0.priority, $0.name) < ($1.priority, $1.name) }
+    }
+
+    private func fetchProviderQuotas(for clients: [ClientConnection]) async -> [ProviderQuota] {
+        var results: [ProviderQuota] = []
+        await withTaskGroup(of: ProviderQuota.self) { group in
+            for client in clients {
+                group.addTask {
+                    do {
+                        return try await self.buildProviderQuota(client: client)
+                    } catch {
+                        return ProviderQuota(
+                            id: client.id,
+                            provider: client.provider,
+                            name: client.name,
+                            isActive: client.isActive,
+                            plan: "unknown",
+                            quotas: [],
+                            limitReached: false,
+                            priority: client.priority ?? 99,
+                            message: nil,
+                            quotaUnavailable: true
+                        )
+                    }
+                }
+            }
+            for await result in group {
+                results.append(result)
+            }
+        }
+        return results
+    }
+
+    private func fetchRecentRequests() async throws -> [RecentRequest] {
+        guard let url = URL(string: "\(baseURL)/api/usage/stats?period=\(recentStatsPeriod.rawValue)") else {
+            throw LoginError.network(URLError(.badURL))
+        }
+        let data = try await get(url: url)
+        let response = try JSONDecoder().decode(RecentUsageStatsResponse.self, from: data)
+        applySnapshotStats(response)
+        return limitedRecentRequests(response.recentRequests)
+    }
+
+    private func applySnapshotStats(_ response: RecentUsageStatsResponse) {
+        guard let totalRequests = response.totalRequests else { return }
+        recentStats = RecentUsageStats(
+            totalRequests: totalRequests,
+            totalPromptTokens: response.totalPromptTokens ?? 0,
+            totalCompletionTokens: response.totalCompletionTokens ?? 0,
+            totalCost: response.totalCost ?? 0
+        )
+    }
+
+    private func consumeRecentStream() async throws {
+        let url = URL(string: "\(baseURL)/api/usage/stream")!
+        var request = URLRequest(url: url)
+        request.setValue("locale=en; auth_token=\(authToken)", forHTTPHeaderField: "Cookie")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+
+        let (lines, response) = try await URLSession.shared.bytes(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            throw LoginError.invalidPassword
+        }
+        recentStreamStatus = .live
+
+        for try await line in lines.lines {
+            try Task.checkCancellation()
+            guard line.hasPrefix("data:") else { continue }
+            let payload = line.dropFirst("data:".count).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard payload != "[DONE]", let data = payload.data(using: .utf8) else { continue }
+            guard let event = try? JSONDecoder().decode(RecentUsageStreamEvent.self, from: data) else { continue }
+            if let recentRequests = event.recentRequests {
+                self.recentRequests = RecentRequestMerger.merged(recentRequests, into: self.recentRequests)
+                recentRequestsError = nil
+                recentStreamStatus = .live
+                scheduleStatsRefreshFromStream()
+            }
+        }
+    }
+
+    private func scheduleStatsRefreshFromStream() {
+        let now = Date()
+        guard now.timeIntervalSince(lastStatsRefresh) >= 4 else { return }
+        lastStatsRefresh = now
+        Task { [weak self] in await self?.refreshRecentStats() }
+    }
+
+    private func limitedRecentRequests(_ requests: [RecentRequest]) -> [RecentRequest] {
+        Array(requests.prefix(RecentUsageStatsResponse.displayLimit))
     }
 
     private func buildProviderQuota(client: ClientConnection) async throws -> ProviderQuota {
@@ -198,7 +483,9 @@ class RouterService: ObservableObject {
             plan: usage.plan ?? "unknown",
             quotas: sortedQuotas,
             limitReached: usage.limitReached ?? false,
-            priority: client.priority ?? 99
+            priority: client.priority ?? 99,
+            message: usage.message,
+            quotaUnavailable: false
         )
     }
 

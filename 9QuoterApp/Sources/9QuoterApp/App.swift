@@ -9,12 +9,8 @@ struct QuoterApp: App {
         MenuBarExtra {
             MenubarContentView(service: service, settings: settings)
                 .onAppear {
-                    // Sync settings -> service on first appear
                     service.baseURL = settings.baseURL
                     service.authToken = settings.authToken
-                    if service.isAuthenticated && service.providers.isEmpty {
-                        service.startAutoRefresh(interval: settings.refreshInterval)
-                    }
                 }
         } label: {
             MenubarLabel(providers: service.providers, isAuthenticated: service.isAuthenticated)

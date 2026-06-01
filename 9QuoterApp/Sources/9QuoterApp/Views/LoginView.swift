@@ -81,7 +81,6 @@ struct LoginView: View {
         do {
             try await service.login(password: password)
             settings.authToken = service.authToken
-            service.startAutoRefresh(interval: settings.refreshInterval)
             password = ""
         } catch {
             errorMsg = error.localizedDescription
