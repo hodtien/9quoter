@@ -172,7 +172,8 @@ class RouterService: ObservableObject {
                     limitReached: provider.limitReached,
                     priority: provider.priority,
                     message: provider.message,
-                    quotaUnavailable: provider.quotaUnavailable
+                    quotaUnavailable: provider.quotaUnavailable,
+                    iconURL: provider.iconURL
                 )
             }
             await refresh()
@@ -199,7 +200,8 @@ class RouterService: ObservableObject {
                 priority: provider.priority,
                 message: provider.message,
                 quotaUnavailable: provider.quotaUnavailable,
-                isLoadingQuota: true
+                isLoadingQuota: true,
+                iconURL: provider.iconURL
             )
         }
         do {
@@ -221,7 +223,8 @@ class RouterService: ObservableObject {
                     limitReached: provider.limitReached,
                     priority: provider.priority,
                     message: nil,
-                    quotaUnavailable: true
+                    quotaUnavailable: true,
+                    iconURL: provider.iconURL
                 )
             }
             self.error = error.localizedDescription
@@ -426,7 +429,8 @@ class RouterService: ObservableObject {
                     priority: client.priority ?? 99,
                     message: "Checking quota...",
                     quotaUnavailable: false,
-                    isLoadingQuota: true
+                    isLoadingQuota: true,
+                    iconURL: client.iconURL
                 )
             }
             .sorted { ($0.priority, $0.name) < ($1.priority, $1.name) }
@@ -450,7 +454,8 @@ class RouterService: ObservableObject {
                             limitReached: false,
                             priority: client.priority ?? 99,
                             message: nil,
-                            quotaUnavailable: true
+                            quotaUnavailable: true,
+                            iconURL: client.iconURL
                         )
                     }
                 }
@@ -536,7 +541,8 @@ class RouterService: ObservableObject {
             limitReached: usage.limitReached ?? false,
             priority: client.priority ?? 99,
             message: usage.message,
-            quotaUnavailable: false
+            quotaUnavailable: false,
+            iconURL: client.iconURL
         )
     }
 

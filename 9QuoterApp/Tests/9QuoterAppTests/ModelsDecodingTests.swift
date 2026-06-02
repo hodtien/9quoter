@@ -85,8 +85,8 @@ struct ModelsDecodingTests {
         let data = Data(#"""
         {
           "connections": [
-            { "id": "codex-1", "provider": "codex", "name": "first@example.com", "isActive": true, "testStatus": "success", "priority": 1 },
-            { "id": "codex-2", "provider": "codex", "name": "second@example.com", "isActive": false, "testStatus": "success", "priority": 2 }
+            { "id": "codex-1", "provider": "codex", "name": "first@example.com", "isActive": true, "testStatus": "success", "priority": 1, "iconURL": "/assets/codex.png" },
+            { "id": "codex-2", "provider": "codex", "name": "second@example.com", "isActive": false, "testStatus": "success", "priority": 2, "iconUrl": "https://example.com/codex.png" }
           ],
           "pagination": { "page": 1, "pageSize": 100, "total": 156, "totalPages": 2 },
           "providerOptions": ["codex"]
@@ -96,6 +96,8 @@ struct ModelsDecodingTests {
         let response = try JSONDecoder().decode(ClientListResponse.self, from: data)
 
         #expect(response.connections.count == 2)
+        #expect(response.connections[0].iconURL == "/assets/codex.png")
+        #expect(response.connections[1].iconURL == "https://example.com/codex.png")
         #expect(response.pagination?.totalPages == 2)
         #expect(response.pagination?.total == 156)
     }

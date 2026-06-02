@@ -7,7 +7,7 @@ struct ProviderIcon: View {
 
     var body: some View {
         if let path = provider.providerIconURL,
-           let url = URL(string: "\(baseURL)\(path)") {
+           let url = iconURL(for: path) {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
@@ -25,6 +25,14 @@ struct ProviderIcon: View {
         } else {
             fallbackIcon
         }
+    }
+
+    private func iconURL(for path: String) -> URL? {
+        if let absolute = URL(string: path), absolute.scheme != nil {
+            return absolute
+        }
+        guard let base = URL(string: baseURL) else { return nil }
+        return URL(string: path, relativeTo: base)?.absoluteURL
     }
 
     private var fallbackIcon: some View {

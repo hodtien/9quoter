@@ -20,6 +20,73 @@ struct ClientConnection: Codable, Identifiable {
     let lastError: String?
     let expiresAt: String?
     let lastUsedAt: String?
+    let iconURL: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, provider, name, isActive, testStatus, priority, email, lastError, expiresAt, lastUsedAt
+        case iconURL, iconUrl, icon, logo, avatar
+    }
+
+    init(
+        id: String,
+        provider: String,
+        name: String,
+        isActive: Bool,
+        testStatus: String? = nil,
+        priority: Int? = nil,
+        email: String? = nil,
+        lastError: String? = nil,
+        expiresAt: String? = nil,
+        lastUsedAt: String? = nil,
+        iconURL: String? = nil
+    ) {
+        self.id = id
+        self.provider = provider
+        self.name = name
+        self.isActive = isActive
+        self.testStatus = testStatus
+        self.priority = priority
+        self.email = email
+        self.lastError = lastError
+        self.expiresAt = expiresAt
+        self.lastUsedAt = lastUsedAt
+        self.iconURL = iconURL
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        provider = try container.decode(String.self, forKey: .provider)
+        name = try container.decode(String.self, forKey: .name)
+        isActive = try container.decode(Bool.self, forKey: .isActive)
+        testStatus = try container.decodeIfPresent(String.self, forKey: .testStatus)
+        priority = try container.decodeIfPresent(Int.self, forKey: .priority)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
+        expiresAt = try container.decodeIfPresent(String.self, forKey: .expiresAt)
+        lastUsedAt = try container.decodeIfPresent(String.self, forKey: .lastUsedAt)
+        let decodedIconURL = try container.decodeIfPresent(String.self, forKey: .iconURL)
+        let decodedIconUrl = try container.decodeIfPresent(String.self, forKey: .iconUrl)
+        let decodedIcon = try container.decodeIfPresent(String.self, forKey: .icon)
+        let decodedLogo = try container.decodeIfPresent(String.self, forKey: .logo)
+        let decodedAvatar = try container.decodeIfPresent(String.self, forKey: .avatar)
+        iconURL = decodedIconURL ?? decodedIconUrl ?? decodedIcon ?? decodedLogo ?? decodedAvatar
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(provider, forKey: .provider)
+        try container.encode(name, forKey: .name)
+        try container.encode(isActive, forKey: .isActive)
+        try container.encodeIfPresent(testStatus, forKey: .testStatus)
+        try container.encodeIfPresent(priority, forKey: .priority)
+        try container.encodeIfPresent(email, forKey: .email)
+        try container.encodeIfPresent(lastError, forKey: .lastError)
+        try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
+        try container.encodeIfPresent(lastUsedAt, forKey: .lastUsedAt)
+        try container.encodeIfPresent(iconURL, forKey: .iconURL)
+    }
 }
 
 struct ClientListResponse: Codable {
@@ -256,6 +323,7 @@ struct ProviderQuota: Identifiable {
     let message: String?
     let quotaUnavailable: Bool
     let isLoadingQuota: Bool
+    let iconURL: String?
 
     init(
         id: String,
@@ -268,7 +336,8 @@ struct ProviderQuota: Identifiable {
         priority: Int,
         message: String?,
         quotaUnavailable: Bool,
-        isLoadingQuota: Bool = false
+        isLoadingQuota: Bool = false,
+        iconURL: String? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -281,6 +350,7 @@ struct ProviderQuota: Identifiable {
         self.message = message
         self.quotaUnavailable = quotaUnavailable
         self.isLoadingQuota = isLoadingQuota
+        self.iconURL = iconURL
     }
 
     var displayName: String {
@@ -298,15 +368,13 @@ struct ProviderQuota: Identifiable {
             email: nil,
             lastError: nil,
             expiresAt: nil,
-            lastUsedAt: nil
+            lastUsedAt: nil,
+            iconURL: iconURL
         )
     }
 
     var providerIconURL: String? {
-        let known = ["claude", "github", "codex", "kiro", "minimax", "gemini", "anthropic", "openai"]
-        let base = provider.components(separatedBy: "-").first ?? provider
-        guard known.contains(base) else { return nil }
-        return "/providers/\(base).png"
+        iconURL
     }
 
     var providerFallbackIcon: String {
