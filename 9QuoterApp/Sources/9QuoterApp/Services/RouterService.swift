@@ -4,12 +4,14 @@ enum LoginError: LocalizedError {
     case invalidPassword
     case noTokenInResponse
     case network(Error)
+    case authenticationFailed
 
     var errorDescription: String? {
         switch self {
         case .invalidPassword: return "Invalid password"
         case .noTokenInResponse: return "Server did not return a token"
         case .network(let e): return e.localizedDescription
+        case .authenticationFailed: return "Check Basic Auth credentials or 9router password"
         }
     }
 }
@@ -36,6 +38,9 @@ class RouterService: ObservableObject {
     }
 
     var baseURL: String
+    var basicAuthCredentials: BasicAuthCredentials
+
+    private let credentialStore: CredentialStoring
     var authToken: String {
         didSet {
             isAuthenticated = !authToken.isEmpty
@@ -51,13 +56,31 @@ class RouterService: ObservableObject {
     private var lastStatsRefresh = Date.distantPast
     private var recentStatsGeneration = 0
 
-    init() {
+    init(credentialStore: CredentialStoring = KeychainCredentialStore()) {
         let savedURL = UserDefaults.standard.string(forKey: "baseURL") ?? "http://localhost:20128"
-        let stored = KeychainStore.load(key: "authToken") ?? ""
+        let stored = credentialStore.load(key: "authToken") ?? ""
         self.baseURL = savedURL
         self.authToken = stored
         self.isAuthenticated = !stored.isEmpty
+        self.credentialStore = credentialStore
+        self.basicAuthCredentials = BasicAuthCredentials(username: "", password: "")
+        syncBasicAuthCredentials()
         // quotaAccountScope is owned by SettingsStore and synced in on appear.
+    }
+
+    func syncBasicAuthCredentials() {
+        syncBasicAuthCredentials(BasicAuthCredentials(
+            username: credentialStore.load(key: SettingsStore.basicAuthUsernameKey) ?? "",
+            password: credentialStore.load(key: SettingsStore.basicAuthPasswordKey) ?? ""
+        ))
+    }
+
+    func syncBasicAuthCredentials(_ credentials: BasicAuthCredentials) {
+        basicAuthCredentials = credentials
+    }
+
+    func reloadBasicAuthCredentials() {
+        syncBasicAuthCredentials()
     }
 
     func login(password: String) async throws {
@@ -66,11 +89,18 @@ class RouterService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("locale=en", forHTTPHeaderField: "Cookie")
+        Self.applyBasicAuth(basicAuthCredentials, to: &request)
         request.httpBody = try JSONEncoder().encode(["password": password])
 
         let config = URLSessionConfiguration.default
         config.httpShouldSetCookies = false
         let (data, response) = try await URLSession(configuration: config).data(for: request)
+
+        if let http = response as? HTTPURLResponse,
+           http.statusCode == 401,
+           basicAuthCredentials.authorizationHeader != nil {
+            throw LoginError.authenticationFailed
+        }
 
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            json["error"] != nil {
@@ -309,6 +339,26 @@ class RouterService: ObservableObject {
         }
     }
 
+    // MARK: - Static Helpers
+
+    static func applyBasicAuth(_ credentials: BasicAuthCredentials, to request: inout URLRequest) {
+        guard let header = credentials.authorizationHeader else { return }
+        guard isLocalOrSecure(request.url) else { return }
+        request.setValue(header, forHTTPHeaderField: "Authorization")
+    }
+
+    private static func isLocalOrSecure(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        if url.scheme == "https" { return true }
+        guard url.scheme == "http" else { return false }
+        let host = url.host ?? ""
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
+    }
+
+    static func applyAuthCookie(token: String, to request: inout URLRequest) {
+        request.setValue("locale=en; auth_token=\(token)", forHTTPHeaderField: "Cookie")
+    }
+
     // MARK: - Private
 
     private func extractAuthToken(from cookieString: String) -> String? {
@@ -435,7 +485,8 @@ class RouterService: ObservableObject {
     private func consumeRecentStream() async throws {
         let url = URL(string: "\(baseURL)/api/usage/stream")!
         var request = URLRequest(url: url)
-        request.setValue("locale=en; auth_token=\(authToken)", forHTTPHeaderField: "Cookie")
+        Self.applyAuthCookie(token: authToken, to: &request)
+        Self.applyBasicAuth(basicAuthCredentials, to: &request)
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
 
         let (lines, response) = try await URLSession.shared.bytes(for: request)
@@ -491,7 +542,8 @@ class RouterService: ObservableObject {
 
     private func get(url: URL) async throws -> Data {
         var request = URLRequest(url: url)
-        request.setValue("locale=en; auth_token=\(authToken)", forHTTPHeaderField: "Cookie")
+        Self.applyAuthCookie(token: authToken, to: &request)
+        Self.applyBasicAuth(basicAuthCredentials, to: &request)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode == 401 {
@@ -504,7 +556,8 @@ class RouterService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.httpBody = body
-        request.setValue("locale=en; auth_token=\(authToken)", forHTTPHeaderField: "Cookie")
+        Self.applyAuthCookie(token: authToken, to: &request)
+        Self.applyBasicAuth(basicAuthCredentials, to: &request)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(baseURL, forHTTPHeaderField: "Origin")

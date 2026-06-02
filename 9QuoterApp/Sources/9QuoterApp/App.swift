@@ -11,6 +11,7 @@ struct QuoterApp: App {
                 .onAppear {
                     service.baseURL = settings.baseURL
                     service.authToken = settings.authToken
+                    service.syncBasicAuthCredentials(settings.basicAuthCredentials)
                 }
         } label: {
             MenubarLabel(providers: service.providers, isAuthenticated: service.isAuthenticated)
