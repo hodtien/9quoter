@@ -20,9 +20,9 @@ struct ProviderFilterBar: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 2)
+            .padding(.vertical, 1)
         }
-        .padding(.bottom, 8)
+        .padding(.bottom, 6)
     }
 
     private func isActive(_ option: ProviderFilterOption) -> Bool {
@@ -62,15 +62,15 @@ private struct ProviderFilterChip: View {
                     .foregroundStyle(isActive ? .white.opacity(0.62) : .white.opacity(0.3))
             }
             .padding(.horizontal, 9)
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .background(
-                isActive ? Color.purple.opacity(0.38) : Color.white.opacity(0.07),
+                isActive ? Color.purple.opacity(0.36) : Color.white.opacity(0.05),
                 in: Capsule()
             )
             .overlay(
                 Capsule()
                     .stroke(
-                        isActive ? Color.purple.opacity(0.55) : Color.white.opacity(0.09),
+                        isActive ? Color.purple.opacity(0.5) : Color.white.opacity(0.055),
                         lineWidth: 1
                     )
             )

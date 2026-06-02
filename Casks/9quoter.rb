@@ -1,6 +1,6 @@
 cask "9quoter" do
-  version "0.1.6"
-  sha256 "4c8b1499c839655e632f32b95d3447a5a14b7bd9abccca153da81058328ed1ad"
+  version "0.1.7"
+  sha256 "83bb0df6c57240d73c9c7386c0f8f5a0f53b0867b7c2f865ca2d7589c6b2397c"
 
   url "https://github.com/hodtien/9quoter/releases/download/v#{version}/9Quoter-#{version}.zip"
   name "9Quoter"
