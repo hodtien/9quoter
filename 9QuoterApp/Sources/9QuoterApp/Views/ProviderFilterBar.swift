@@ -4,6 +4,7 @@ struct ProviderFilterBar: View {
     let options: [ProviderFilterOption]
     let selected: String?
     let baseURL: String
+    let basicAuth: BasicAuthCredentials?
     let onSelect: (String?) -> Void
 
     var body: some View {
@@ -13,7 +14,8 @@ struct ProviderFilterBar: View {
                     ProviderFilterChip(
                         option: option,
                         isActive: isActive(option),
-                        baseURL: baseURL
+                        baseURL: baseURL,
+                        basicAuth: basicAuth
                     ) {
                         onSelect(chipSelection(option))
                     }
@@ -48,6 +50,7 @@ private struct ProviderFilterChip: View {
     let option: ProviderFilterOption
     let isActive: Bool
     let baseURL: String
+    let basicAuth: BasicAuthCredentials?
     let action: () -> Void
 
     var body: some View {
@@ -81,7 +84,7 @@ private struct ProviderFilterChip: View {
     @ViewBuilder
     private var chipIcon: some View {
         if let representative = option.representative {
-            ProviderIcon(provider: representative, baseURL: baseURL, size: 14)
+            ProviderIcon(provider: representative, baseURL: baseURL, size: 14, basicAuth: basicAuth)
         } else {
             Image(systemName: "square.grid.2x2")
                 .font(.system(size: 10, weight: .medium))

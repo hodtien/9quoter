@@ -4,6 +4,7 @@ struct ProviderGroupHeader: View {
     let providerName: String
     let accounts: [ProviderQuota]
     let baseURL: String
+    var basicAuth: BasicAuthCredentials? = nil
 
     private var title: String {
         ProviderFilterOption.providerTitle(for: providerName)
@@ -20,7 +21,7 @@ struct ProviderGroupHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             if let representative {
-                ProviderIcon(provider: representative, baseURL: baseURL, size: 18)
+                ProviderIcon(provider: representative, baseURL: baseURL, size: 18, basicAuth: basicAuth)
             }
 
             Text(title)

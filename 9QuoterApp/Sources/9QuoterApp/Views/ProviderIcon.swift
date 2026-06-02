@@ -4,30 +4,41 @@ struct ProviderIcon: View {
     let provider: ProviderQuota
     let baseURL: String
     let size: CGFloat
+    var basicAuth: BasicAuthCredentials? = nil
+
+    @State private var image: NSImage?
+    @StateObject private var loader = ProviderImageLoader.shared
 
     var body: some View {
-        if let path = provider.providerIconURL,
-           let url = iconURL(for: path) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: size, height: size)
-                        .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
-                case .failure, .empty:
-                    fallbackIcon
-                @unknown default:
-                    fallbackIcon
-                }
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+            } else {
+                fallbackIcon
             }
-        } else {
-            fallbackIcon
+        }
+        .task(id: iconURL()) {
+            guard let url = iconURL() else { return }
+            image = await loader.image(for: url, basicAuth: basicAuth)
         }
     }
 
-    private func iconURL(for path: String) -> URL? {
+    private func iconURL() -> URL? {
+        if let apiPath = provider.providerIconURL,
+           let resolved = resolveURL(for: apiPath) {
+            return resolved
+        }
+        guard let base = URL(string: baseURL) else { return nil }
+        let path = "providers/\(provider.provider).png"
+        return URL(string: path, relativeTo: base)?.absoluteURL
+    }
+
+    private func resolveURL(for path: String) -> URL? {
         if let absolute = URL(string: path), absolute.scheme != nil {
             return absolute
         }

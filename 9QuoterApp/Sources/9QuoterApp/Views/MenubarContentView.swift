@@ -202,7 +202,8 @@ struct MenubarContentView: View {
                     ProviderFilterBar(
                         options: providerFilterOptions,
                         selected: resolvedSelectedProviderFilter,
-                        baseURL: settings.baseURL
+                        baseURL: settings.baseURL,
+                        basicAuth: settings.basicAuthCredentials
                     ) { key in
                         selectedProviderFilter = key
                     }
@@ -356,7 +357,12 @@ struct MenubarContentView: View {
                                     .background(Color.white.opacity(0.06))
                                     .padding(.horizontal, 12)
                             } header: {
-                                ProviderGroupHeader(providerName: group.key, accounts: group.value, baseURL: settings.baseURL)
+                                ProviderGroupHeader(
+                                    providerName: group.key,
+                                    accounts: group.value,
+                                    baseURL: settings.baseURL,
+                                    basicAuth: settings.basicAuthCredentials
+                                )
                             }
                         }
                     }
