@@ -5,6 +5,8 @@ struct LoginView: View {
     @ObservedObject var settings: SettingsStore
 
     @State private var password = ""
+    @State private var basicAuthUsername = ""
+    @State private var basicAuthPassword = ""
     @State private var isLoggingIn = false
     @State private var errorMsg: String?
     @FocusState private var focused: Bool
@@ -48,6 +50,21 @@ struct LoginView: View {
                         .onSubmit { Task { await doLogin() } }
                 }
 
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Basic Auth (optional)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("Username", text: $basicAuthUsername)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12))
+                    SecureField("Password", text: $basicAuthPassword)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12))
+                    Text("Use this only if the server prompts for browser-level authentication.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+
                 if let err = errorMsg {
                     Text(err)
                         .font(.system(size: 11))
@@ -71,13 +88,19 @@ struct LoginView: View {
             .padding(16)
         }
         .frame(width: 280)
-        .onAppear { focused = true }
+        .onAppear {
+            basicAuthUsername = settings.basicAuthUsername
+            basicAuthPassword = settings.basicAuthPassword
+            focused = true
+        }
     }
 
     private func doLogin() async {
         isLoggingIn = true
         errorMsg = nil
+        settings.setBasicAuth(username: basicAuthUsername, password: basicAuthPassword)
         service.baseURL = settings.baseURL
+        service.basicAuthCredentials = settings.basicAuthCredentials
         do {
             try await service.login(password: password)
             settings.authToken = service.authToken
